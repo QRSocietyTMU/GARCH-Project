@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from src.benchmarks import hist_var, ewma
 from src.garch import RollingGarch
-from src.evaluation import score
+from src.evaluation import score, dm_table
 from src.risk import backtest
 from src.regimes import regime_labels, score_by_regime
 
@@ -50,23 +50,30 @@ def next_day_vol(returns, refit_every=20):
 
 
 def run_all(returns, refit_every=20, min_train=250):
-  """Every model on every pair: forecasts, accuracy scores, VaR backtests and calm/stressed scores."""
-  outs, fits, results, risk, by_regime = {}, {}, {}, {}, {}
+  """Every model on every pair: forecasts, accuracy scores, DM tests, VaR backtests and
+  calm/stressed scores."""
+  outs, fits, results, risk, by_regime, dm, dm_by_regime = {}, {}, {}, {}, {}, {}, {}
   for c in returns.columns:
     t0 = time.time()
     models = build_models(refit_every)
     out = get_forecasts(returns[c], models, min_train=min_train)
     outs[c] = out
-    fits[c] = {m: (models[m].n_fits, models[m].n_failed) for m in ["garch11", "gjr_garch"]}
+    fits[c] = {m: models[m] for m in ["garch11", "gjr_garch"]}
+    regime = regime_labels(returns[c])
     results[c] = score(out)
+    dm[c] = dm_table(out)
     risk[c] = backtest(out)
-    by_regime[c] = score_by_regime(out, regime_labels(returns[c]))
+    by_regime[c] = score_by_regime(out, regime)
+    dm_by_regime[c] = score_by_regime(out, regime, dm_table)
+    counts = {m: (g.n_fits, len(g.failed), len(g.odd)) for m, g in fits[c].items()}
     print(f"{c}/USD: {len(out)} forecast days, {time.time() - t0:.0f}s, "
-          f"GARCH fits (total, failed): {fits[c]}")
+          f"GARCH fits (total, failed, odd): {counts}")
   latest = pd.DataFrame({f"{c}/USD": next_day_vol(returns[c], refit_every) for c in returns.columns}).T
   return {
     "outs": outs,
     "results": pd.concat(results, names=["currency", "model"]),
+    "dm": pd.concat(dm, names=["currency", "model"]),
+    "dm_by_regime": pd.concat(dm_by_regime, names=["currency", "regime", "model"]),
     "risk": pd.concat(risk, names=["currency", "model", "alpha"]),
     "by_regime": pd.concat(by_regime, names=["currency", "regime", "model"]),
     "next_day_vol": latest,

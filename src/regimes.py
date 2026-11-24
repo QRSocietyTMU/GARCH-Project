@@ -14,14 +14,15 @@ def regime_labels(returns, window=20, q=0.75, min_history=250):
   return lab
 
 
-def score_by_regime(out, regime):
-  """MAE/RMSE/QLIKE separately for calm and stressed days, one row per (regime, model)."""
+def score_by_regime(out, regime, fn=score):
+  """`fn` (MAE/RMSE/QLIKE by default) separately for calm and stressed days,
+  one row per (regime, model)."""
   reg = regime.reindex(out.index)
   tables = {}
   for g in ["calm", "stressed"]:
     mask = (reg == g).values
     if mask.any():
-      t = score(out[mask])
+      t = fn(out[mask])
       t.insert(0, "n_days", mask.sum())
       tables[g] = t
   return pd.concat(tables, names=["regime", "model"])

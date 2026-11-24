@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from arch import arch_model
 from src.data import fetch_returns
-from src.garch import RollingGarch
+from src.garch import RollingGarch, is_odd
 from src.pipeline import get_forecasts
 
 
@@ -56,3 +56,10 @@ def test_rolling_garch_ignores_future():
   # after the cut the junk must show up, otherwise this test couldn't catch anything
   for m in cols:
     assert not np.allclose(a.loc[a.index > cut, m], b.loc[b.index > cut, m]), m
+
+
+def test_is_odd_flags_edge_fits():
+  normal = pd.Series({"alpha[1]": 0.05, "beta[1]": 0.90})
+  assert not is_odd(normal)
+  assert is_odd(pd.Series({"alpha[1]": 0.05, "beta[1]": 0.95}))      # persistence = 1
+  assert is_odd(pd.Series({"alpha[1]": 0.0, "beta[1]": 0.95}))       # alpha = 0
