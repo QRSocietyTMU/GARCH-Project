@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from src.evaluation import mae, rmse, qlike, score
+from src.evaluation import mae, rmse, qlike, score, dm_test
 
 
 def test_metrics_values():
@@ -41,3 +41,13 @@ def test_score_values():
   assert list(t.index) == ["hist_30", "ewma"]
   assert np.isclose(t.loc["hist_30", "MAE"], 1 / 3)
   assert np.isclose(t.loc["ewma", "RMSE"], np.sqrt((1 + 4 + 4) / 3))
+
+
+def test_dm_test_values():
+  rng = np.random.default_rng(0)
+  a = rng.normal(1.0, 1, 2000)
+  b = rng.normal(1.5, 1, 2000)                                # b's loss is clearly higher
+  stat, p = dm_test(a, b)
+  assert stat < 0 and p < 0.01
+  assert np.isclose(dm_test(b, a)[0], -stat)                  # swapping flips the sign
+  assert dm_test(a, rng.normal(1.0, 1, 2000))[1] > 0.05       # same average loss -> not significant

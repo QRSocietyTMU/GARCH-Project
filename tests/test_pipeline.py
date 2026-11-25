@@ -43,6 +43,16 @@ def test_get_forecasts_ignores_future(fake_returns):
   assert not np.allclose(a.loc[a.index > cut, "last"], b.loc[b.index > cut, "last"])
 
 
+def test_get_forecasts_dates_align(fake_returns):
+  out = get_forecasts(fake_returns, {"last": lambda train: train.iloc[-1]}, min_train=MIN_TRAIN)
+  # one row per day after the training window, nothing missing
+  assert out.index.equals(fake_returns.index[MIN_TRAIN:])
+  assert out.notna().all().all()
+  # each row holds that day's actual return and the forecast made the day before
+  assert out["realized"].equals(fake_returns.iloc[MIN_TRAIN:])
+  assert out["last"].equals(fake_returns.shift(1).iloc[MIN_TRAIN:])
+
+
 def test_run_all_final_checks():
   """The original notebook's final checks. Runs every model on every pair (~1.5 min)."""
   returns = fetch_returns()
@@ -60,6 +70,7 @@ def test_run_all_final_checks():
   # every results/risk cell is filled
   assert run["results"].notna().all().all()
   assert run["risk"].notna().all().all()
+  assert run["dm"].notna().all().all()
   assert run["next_day_vol"].notna().all().all()
   # the loop forecast for the last day matches calling the model directly (no hidden state bugs)
   for c in returns.columns:
